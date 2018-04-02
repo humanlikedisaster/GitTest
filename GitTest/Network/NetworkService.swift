@@ -82,12 +82,12 @@ class NetworkService {
                 return
             }
 
-                self.delegate?.loaded(json: json)
-                if json.count == 100 {
-                    self.getData(username: username, currentPage: currentPage + 1)
-                } else {
-                    self.state.value = .loaded
-                }
+            self.delegate?.loaded(json: json)
+            if json.count == 100 {
+                self.getData(username: username, currentPage: currentPage + 1)
+            } else {
+                self.state.value = .loaded
+            }
         }, failure: { [unowned self] (error) in
             let errorString = error.localizedDescription
             self.state.value = .error(.networkError(errorString))

@@ -60,6 +60,7 @@ class ViewController: UIViewController {
         
         activityBackground.layer.cornerRadius = 10
         
+        
         if coordinator == nil {
             coordinator = Coordinator()
             coordinator?.repos.asObservable().subscribe(onNext: { [weak self] (repoList) in
@@ -120,8 +121,10 @@ class ViewController: UIViewController {
 extension ViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         guard let search = searchBar.text else { return }
-        searchBar.endEditing(false)
-        coordinator?.load(username: search)
+        if search.count > 0 {
+            searchBar.endEditing(false)
+            coordinator?.load(username: search)
+        }
     }
     
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {

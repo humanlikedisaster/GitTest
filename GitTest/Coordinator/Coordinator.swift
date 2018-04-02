@@ -23,12 +23,14 @@ class Coordinator {
 
     init() {
         networkService = NetworkService()
+        
+        database.delegate = self
+        
         networkService.delegate = self
         networkService.state.asObservable().subscribe(onNext: { [unowned self] (result) in
             DispatchQueue.main.async {
                 switch result {
                 case .loaded:
-                    self.loadFromDatabase()
                     break
                 case .error(let errorMessage):
                     switch errorMessage {
@@ -38,12 +40,11 @@ class Coordinator {
                             self.errorMessage.value = ("Network error", errorString)
                         }
                     case .noData, .unknown:
-                        self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
                         self.loadFromDatabase()
+                        self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
                     case .noResult:
                         self.errorMessage.value = ("Nothing found", "There is no such user or organization.")
                         self.repos.value = nil
-                        break
                     }
                 case .loading: self.repos.value = nil
                 }
@@ -66,6 +67,16 @@ class Coordinator {
     
     func sortedLanguages() -> [String] {
         return languages
+    }
+}
+
+extension Coordinator: DatabaseDelegate {
+    func databaseUpdated() {
+        switch networkService.state.value {
+        case .loaded:
+            self.loadFromDatabase()
+        default: break
+        }
     }
 }
 
