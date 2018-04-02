@@ -1,0 +1,20 @@
+PODS:
+  - Realm (3.3.1):
+    - Realm/Headers (= 3.3.1)
+  - Realm/Headers (3.3.1)
+  - RealmSwift (3.3.1):
+    - Realm (= 3.3.1)
+  - RxSwift (4.1.2)
+
+DEPENDENCIES:
+  - RealmSwift
+  - RxSwift (~> 4.0)
+
+SPEC CHECKSUMS:
+  Realm: 63ebf4903b446b0bdf2131244eb1e1549925c724
+  RealmSwift: f28fe8507bdfb8f1c924962401b83e7b9d7abb5c
+  RxSwift: e49536837d9901277638493ea537394d4b55f570
+
+PODFILE CHECKSUM: 24215281a2d20f10f064aa59acda2e7583375322
+
+COCOAPODS: 1.4.0
