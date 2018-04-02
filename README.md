@@ -17,3 +17,7 @@ I've used simple MVVM architecture pattern, there role of ViewModel perform Coor
 # Network 
 
 For getting data from GitHub I've used v3 api with /orgs/:org/repos or /users/:user/repos endpoints. Because of limits (100 repos per page) I've used recursive function to get all data. Firsly app trying to find organization with searched name, if there is no such organization - it tries to get repos by username. All repos after is stored to Realm database, and after the end of request queue Database is used to show all information. If is request fail or timeout - app try to use stored in local database information.
+
+# Database
+
+Working with Realm I write all information in global queue, after I wait for Realm notification and update UI from main queue. This allows writing not to block the main thread and doesn't cause concurrency issues.
