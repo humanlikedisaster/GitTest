@@ -60,19 +60,12 @@ class ViewController: UIViewController {
         
         activityBackground.layer.cornerRadius = 10
         
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(notification:)), name: NSNotification.Name.UIKeyboardWillShow, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(notification:)), name: NSNotification.Name.UIKeyboardWillHide, object: nil)
-    }
-    
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        
         if coordinator == nil {
             coordinator = Coordinator()
             coordinator?.repos.asObservable().subscribe(onNext: { [weak self] (repoList) in
                 self?.tableView.reloadData()
                 
-                if repoList == nil {
+                if repoList == nil && self?.coordinator?.errorMessage.value == nil {
                     self?.activityIndicator.startAnimating()
                     self?.activityBackground.isHidden = false
                 } else {
@@ -80,7 +73,20 @@ class ViewController: UIViewController {
                     self?.activityBackground.isHidden = true
                 }
             }).disposed(by: bag)
+            
+            coordinator?.errorMessage.asObservable().subscribe(onNext: { [unowned self] (errorValue) in
+                if let error = errorValue {
+                    self.showErrorAlert(error.0, error.1)
+                }
+            }).disposed(by: bag)
         }
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(notification:)), name: NSNotification.Name.UIKeyboardWillShow, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(notification:)), name: NSNotification.Name.UIKeyboardWillHide, object: nil)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
     }
     
     @objc func keyboardWillShow(notification: NSNotification) {
@@ -102,6 +108,12 @@ class ViewController: UIViewController {
         UIView.animate(withDuration: duration, delay: 0, options: UIViewAnimationOptions(rawValue: curve), animations: { () -> Void in
             self.view.layoutIfNeeded()
         }, completion: nil)
+    }
+    
+    fileprivate func showErrorAlert(_ title: String, _ message: String) {
+        let alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alertController.addAction(.init(title: "Ok", style: .default, handler: nil))
+        self.present(alertController, animated: true)
     }
 }
 

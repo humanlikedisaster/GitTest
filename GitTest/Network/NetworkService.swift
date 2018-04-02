@@ -18,8 +18,12 @@ enum UserType: String {
     case organization = "orgs"
 }
 
+enum ErrorMessage {
+    case noResult, noData, unknown, networkError(String)
+}
+
 enum NetworkState {
-    case loading, loaded, error
+    case loading, loaded, error(ErrorMessage)
 }
 
 class NetworkService {
@@ -46,16 +50,37 @@ class NetworkService {
         
         guard let url = URL(string: urlString) else { return }
         
-        get(url: url, complition: { [unowned self] (data) in
-                guard let response = data, let jsonOptional = try? JSONSerialization.jsonObject(with: response, options: []) as? [[String: Any?]], let json = jsonOptional else {
-                    if userType == .organization && currentPage == 0 {
-                        self.getData(username: username, userType: .user, currentPage: 0)
-                    } else {
-                        self.state.value = .error
-                    }
-                    
+        get(url: url, complition: { [unowned self] (data, response) in
+            guard let responseData = data else {
+                    self.state.value = .error(.noData)
                     return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                self.state.value = .error(.unknown)
+                return
+            }
+            
+            let code = httpResponse.statusCode
+            
+            guard code == 200 else {
+                if code == 404 {
+                    self.state.value = .error(.noResult)
+                } else {
+                    self.state.value = .error(.unknown)
                 }
+                return
+            }
+            
+            guard let jsonOptional = try? JSONSerialization.jsonObject(with: responseData, options: []) as? [[String: Any?]], let json = jsonOptional else {
+                if userType == .organization && currentPage == 0 {
+                    self.getData(username: username, userType: .user, currentPage: 0)
+                } else {
+                    self.state.value = .error(.unknown)
+                }
+                
+                return
+            }
 
                 self.delegate?.loaded(json: json)
                 if json.count == 100 {
@@ -63,20 +88,20 @@ class NetworkService {
                 } else {
                     self.state.value = .loaded
                 }
-
         }, failure: { [unowned self] (error) in
-            self.state.value = .error
+            let errorString = error.localizedDescription
+            self.state.value = .error(.networkError(errorString))
         })
     }
     
-    fileprivate func get(url: URL, complition: @escaping (Data?) -> Void, failure: @escaping (Error) -> Void) {
+    fileprivate func get(url: URL, complition: @escaping (Data?, URLResponse?) -> Void, failure: @escaping (Error) -> Void) {
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 300)
         let session = URLSession(configuration: .default)
         session.dataTask(with: request) { (data, response, error) in
             if let error = error {
                 failure(error)
             } else {
-                complition(data)
+                complition(data, response)
             }
         }.resume()
     }
