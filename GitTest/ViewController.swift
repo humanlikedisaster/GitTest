@@ -120,11 +120,9 @@ class ViewController: UIViewController {
 
 extension ViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        guard let search = searchBar.text else { return }
-        if search.count > 0 {
-            searchBar.endEditing(false)
-            coordinator?.load(username: search)
-        }
+        guard let search = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), search.count > 0 else { return }
+        searchBar.endEditing(false)
+        coordinator?.load(username: search)
     }
     
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
