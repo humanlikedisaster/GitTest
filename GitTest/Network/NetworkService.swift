@@ -9,10 +9,6 @@
 import Foundation
 import RxSwift
 
-protocol NetworkServiceDelegate {
-    func loaded(json: [[String: Any?]])
-}
-
 enum Response {
     case dictionary([String: Any?])
     case array([[String: Any?]])
@@ -28,27 +24,28 @@ enum ErrorMessage {
 }
 
 enum NetworkState {
-    case loading, loaded, error(ErrorMessage)
+    case loading([[String: Any?]]), error(ErrorMessage)
 }
 
 class NetworkService {
-    let host = "https://api.github.com/"
+    fileprivate let host = "https://api.github.com/"
     
     let oauthService: AuthorizationService
-    var delegate: NetworkServiceDelegate?
-    
-    let state = Variable<NetworkState>(.loaded)
-    
+    fileprivate let session = URLSession(configuration: .default)
     fileprivate let bag = DisposeBag()
     
-    init(delegate: NetworkServiceDelegate? = nil) {
+    init() {
         self.oauthService = AuthorizationService()
-        self.delegate = delegate
     }
     
-    func load(username: String) {
-        state.value = .loading
-        getData(username: username, currentPage: 1)
+    func load(username: String) -> Observable<NetworkState> {
+        return Observable<NetworkState>.create({ [unowned self] (observable) -> Disposable in
+            print("Loading started!")
+            self.getData(username: username, currentPage: 1, observable)
+            
+            return Disposables.create { }
+        })
+        
     }
     
     func searchUser(username: String, completion: @escaping ([String]) -> Void, failure: @escaping () -> Void) {
@@ -77,7 +74,7 @@ class NetworkService {
         }
     }
     
-    fileprivate func getData(username: String, userType: UserType = .organization, currentPage: Int) {
+    fileprivate func getData(username: String, userType: UserType = .organization, currentPage: Int, _ observable: AnyObserver<NetworkState>) {
         let urlString: String
         urlString = "\(host)\(userType.rawValue)/\(username)/repos?per_page=100&page=\(currentPage)&client_id=\(self.oauthService.clientId)&client_secret=\(self.oauthService.clientSecret)"
         
@@ -86,25 +83,25 @@ class NetworkService {
         getWrapped(url: url, completion: { (response) in
             switch response {
             case .array(let json):
-                self.delegate?.loaded(json: json)
+                observable.onNext(.loading(json))
                 
                 if json.count == 100 {
-                    self.getData(username: username, userType: userType, currentPage: currentPage + 1)
+                    self.getData(username: username, userType: userType, currentPage: currentPage + 1, observable)
                 } else {
-                    self.state.value = .loaded
+                    observable.onCompleted()
                 }
             case .dictionary(_):
-                self.state.value = .error(.unknown)
+                observable.onNext(.error(.unknown))
             }
         }) { (error) in
             switch error {
             case .noResult:
                 if userType == .organization && currentPage == 1 {
-                    self.getData(username: username, userType: .user, currentPage: 1)
+                    self.getData(username: username, userType: .user, currentPage: 1, observable)
                 } else {
-                    self.state.value = .error(error)
+                    observable.onNext(.error(error))
                 }
-            default: self.state.value = .error(error)
+            default: observable.onNext(.error(error))
             }
             
         }
@@ -150,13 +147,14 @@ class NetworkService {
     
     fileprivate func get(url: URL, completion: @escaping (Data?, URLResponse?) -> Void, failure: @escaping (Error) -> Void) {
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 300)
-        let session = URLSession(configuration: .default)
-        session.dataTask(with: request) { (data, response, error) in
+        
+        let task = session.dataTask(with: request) { (data, response, error) in
             if let error = error {
                 failure(error)
             } else {
                 completion(data, response)
             }
-        }.resume()
+        }
+        task.resume()
     }
 }

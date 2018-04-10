@@ -49,20 +49,17 @@ class Repo: Object {
     }
 }
 
-protocol DatabaseDelegate {
-    func databaseUpdated()
-}
-
 class Database {
-    fileprivate var realm: Realm!
+    fileprivate var realm: Realm
     fileprivate var token: NotificationToken!
-    var delegate: DatabaseDelegate?
+    var databaseUpdates: ReplaySubject<Void>
     
     init() {
         realm = try! Realm()
+        databaseUpdates = ReplaySubject.create(bufferSize: 1)
         
-        token = self.realm.observe({ [weak self] (notification, realm) in
-            self?.delegate?.databaseUpdated()
+        token = realm.observe({ [unowned self] (notification, realm) in
+            self.databaseUpdates.onNext(())
         })
     }
     

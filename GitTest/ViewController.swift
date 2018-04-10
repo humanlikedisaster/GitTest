@@ -121,13 +121,12 @@ class ViewController: UIViewController {
                 }, onError: { [weak self] (error) in
                     self?.stopLoading()
                 }).disposed(by: bag)
-            
         }
-
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        searchController.isActive = true
     }
     
     fileprivate func startLoading() {
@@ -178,7 +177,7 @@ extension ViewController: UITableViewDelegate {
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        searchController.searchBar.endEditing(false)
+        searchController.isActive = false
     }
 }
 

@@ -8,47 +8,19 @@
 
 import Foundation
 import RxSwift
+import RxCocoa
 import RealmSwift
 
 class Coordinator {
-    fileprivate var currentSearch: String = ""
     fileprivate let database = Database()
-    fileprivate let networkService: NetworkService
-    fileprivate let bag = DisposeBag()
+    fileprivate let networkService = NetworkService()
+    fileprivate var bag = DisposeBag()
+    fileprivate var currentLoad: Observable<NetworkState>?
     
     fileprivate var languages: [String] = []
 
     let errorMessage = Variable<(String, String)?>(nil)
     let repos = Variable<[Results<Repo>]?>([])
-
-    init() {
-        networkService = NetworkService()
-        
-        database.delegate = self
-        
-        networkService.delegate = self
-        networkService.state.asObservable().observeOn(MainScheduler.instance).subscribe(onNext: { [unowned self] (result) in
-            switch result {
-            case .loaded:
-                break
-            case .error(let errorMessage):
-                switch errorMessage {
-                case .networkError(let errorString):
-                    self.loadFromDatabase()
-                    if self.languages.count == 0 {
-                        self.errorMessage.value = ("Network error", errorString)
-                    }
-                case .noData, .unknown:
-                    self.loadFromDatabase()
-                    self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
-                case .noResult:
-                    self.errorMessage.value = ("Nothing found", "There is no such user or organization.")
-                    self.repos.value = nil
-                }
-            case .loading: self.repos.value = nil
-            }
-        }).disposed(by: bag)
-    }
     
     func loadSuggestions(_ username: String) -> Single<[String]> {
         return Single<[String]>.create(subscribe: { [weak self] (single) -> Disposable in
@@ -64,37 +36,47 @@ class Coordinator {
 
     func load(username: String) {
         errorMessage.value = nil
-        currentSearch = username
         languages.removeAll()
         self.repos.value = nil
-        networkService.load(username: currentSearch)
+        bag = DisposeBag()
+        currentLoad = networkService.load(username: username).observeOn(MainScheduler.instance).share()
+
+        guard let currentLoad = currentLoad else { return }
+
+        currentLoad.subscribe(onNext: { [unowned self] result in
+            switch result {
+            case .error(let errorMessage):
+                switch errorMessage {
+                case .networkError(let errorString):
+                    self.loadFromDatabase(username)
+                    if self.languages.count == 0 {
+                        self.errorMessage.value = ("Network error", errorString)
+                    }
+                case .noData, .unknown:
+                    self.loadFromDatabase(username)
+                    self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
+                case .noResult:
+                    self.errorMessage.value = ("Nothing found", "There is no such user or organization.")
+                    self.repos.value = nil
+                }
+            case .loading(let json): self.database.create(jsonArray: json)
+            }
+        }).disposed(by: bag)
+        
+        currentLoad.toArray().flatMapLatest {
+            [unowned self] _ in return self.database.databaseUpdates
+        }.subscribe(onNext: { () in
+            self.loadFromDatabase(username)
+        }).disposed(by: bag)
     }
     
-    fileprivate func loadFromDatabase() {
-        let models = self.database.get(username: self.currentSearch).sorted { $0.value.count > $1.value.count }
+    fileprivate func loadFromDatabase(_ username: String) {
+        let models = self.database.get(username: username).sorted { $0.value.count > $1.value.count }
         self.languages = models.map { $0.key }
         self.repos.value = models.map { $0.value }
     }
     
     func sortedLanguages() -> [String] {
         return languages
-    }
-}
-
-extension Coordinator: DatabaseDelegate {
-    func databaseUpdated() {
-        switch networkService.state.value {
-        case .loaded:
-            self.loadFromDatabase()
-        default: break
-        }
-    }
-}
-
-extension Coordinator: NetworkServiceDelegate {
-    func loaded(json: [[String : Any?]]) {
-        DispatchQueue.global().async {
-            self.database.create(jsonArray: json)
-        }
     }
 }
