@@ -8,6 +8,7 @@
 
 import UIKit
 import RxSwift
+import RxCocoa
 
 class HeaderCell: UITableViewCell {
     @IBOutlet weak var nameLabel: UILabel!
@@ -40,17 +41,34 @@ class RepoCell: UITableViewCell {
 }
 
 class ViewController: UIViewController {
-    var coordinator: Coordinator?
-    let bag = DisposeBag()
+    fileprivate var coordinator: Coordinator?
+    fileprivate let bag = DisposeBag()
+    fileprivate let searchController = UISearchController(searchResultsController: nil)
+    fileprivate var suggestions: [String]? = nil
     
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     @IBOutlet weak var activityBackground: UIView!
-    @IBOutlet weak var searchBar: UISearchBar!
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var bottomConstraint: NSLayoutConstraint!
     
+    private func searchBarIsEmpty() -> Bool {
+        return searchController.searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+    }
+    
+    fileprivate var isFiltering: Bool {
+        return searchController.isActive && !searchBarIsEmpty()
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        searchController.searchBar.delegate = self
+        
+        searchController.searchBar.placeholder = "Search Users/Organizations"
+        searchController.dimsBackgroundDuringPresentation = false
+        navigationItem.searchController = searchController
+
+        searchController.isActive = true
         
         tableView.rowHeight = UITableViewAutomaticDimension
         tableView.estimatedRowHeight = 160
@@ -60,55 +78,74 @@ class ViewController: UIViewController {
         
         activityBackground.layer.cornerRadius = 10
         
-        
         if coordinator == nil {
             coordinator = Coordinator()
-            coordinator?.repos.asObservable().subscribe(onNext: { [weak self] (repoList) in
+            coordinator?.repos.asObservable().observeOn(MainScheduler.instance).subscribe(onNext: { [weak self] (repoList) in
                 self?.tableView.reloadData()
                 
                 if repoList == nil && self?.coordinator?.errorMessage.value == nil {
-                    self?.activityIndicator.startAnimating()
-                    self?.activityBackground.isHidden = false
+                    self?.startLoading()
                 } else {
-                    self?.activityIndicator.stopAnimating()
-                    self?.activityBackground.isHidden = true
+                    self?.stopLoading()
                 }
             }).disposed(by: bag)
             
-            coordinator?.errorMessage.asObservable().subscribe(onNext: { [unowned self] (errorValue) in
+            coordinator?.errorMessage.asObservable().observeOn(MainScheduler.instance).subscribe(onNext: { [unowned self] (errorValue) in
                 if let error = errorValue {
                     self.showErrorAlert(error.0, error.1)
                 }
             }).disposed(by: bag)
-        }
         
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(notification:)), name: NSNotification.Name.UIKeyboardWillShow, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(notification:)), name: NSNotification.Name.UIKeyboardWillHide, object: nil)
+            searchController.searchBar.rx.text.orEmpty
+                .throttle(0.3, scheduler: MainScheduler.instance)
+                .distinctUntilChanged()
+                .observeOn(MainScheduler.instance)
+                .flatMapLatest { [weak self] query -> Single<[String]> in
+                    let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if query.isEmpty {
+                        return Single.never()
+                    }
+                    
+                    self?.startLoading()
+                    
+                    guard let single = self?.coordinator?.loadSuggestions(query) else {
+                        return Single.never()
+                    }
+                    return single
+                }
+                .subscribe(onNext: { [weak self] (list) in
+                    self?.stopLoading()
+                    
+                    self?.suggestions = list
+                    self?.tableView.reloadData()
+                }, onError: { [weak self] (error) in
+                    self?.stopLoading()
+                }).disposed(by: bag)
+            
+        }
+
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
     }
     
-    @objc func keyboardWillShow(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,  let duration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? Double,
-            let curve = userInfo[UIKeyboardAnimationCurveUserInfoKey] as? UInt else { return }
-        let keyboardHeight = (userInfo[UIKeyboardFrameEndUserInfoKey] as AnyObject).cgRectValue.size.height
-        bottomConstraint.constant = keyboardHeight
-        UIView.animate(withDuration: duration, delay: 0, options: UIViewAnimationOptions(rawValue: curve), animations: { () -> Void in
-            self.view.layoutIfNeeded()
-        }, completion: nil)
+    fileprivate func startLoading() {
+        activityIndicator.startAnimating()
+        activityBackground.isHidden = false
     }
     
-    @objc func keyboardWillHide(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,
-            let duration = userInfo[UIKeyboardAnimationDurationUserInfoKey] as? Double,
-            let curve = userInfo[UIKeyboardAnimationCurveUserInfoKey] as? UInt else { return }
-        bottomConstraint.constant = 0.0
+    fileprivate func stopLoading() {
+        activityIndicator.stopAnimating()
+        activityBackground.isHidden = true
+    }
+    
+    fileprivate func getRepos(for username: String) {
+        searchController.isActive = false
+        tableView.reloadData()
+        navigationItem.title = "Search for: \(username)"
         
-        UIView.animate(withDuration: duration, delay: 0, options: UIViewAnimationOptions(rawValue: curve), animations: { () -> Void in
-            self.view.layoutIfNeeded()
-        }, completion: nil)
+        coordinator?.load(username: username)
     }
     
     fileprivate func showErrorAlert(_ title: String, _ message: String) {
@@ -121,31 +158,44 @@ class ViewController: UIViewController {
 extension ViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         guard let search = searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines), search.count > 0 else { return }
-        searchBar.endEditing(false)
-        coordinator?.load(username: search)
+        
+        getRepos(for: search)
     }
     
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.endEditing(false)
+        searchController.isActive = false
     }
 }
 
 extension ViewController: UITableViewDelegate {
     func sectionIndexTitles(for tableView: UITableView) -> [String]? {
-        let short = coordinator?.sortedLanguages().map { String($0.prefix(5)) }
-        return short
+        if isFiltering {
+            return nil
+        } else {
+            let short = coordinator?.sortedLanguages().map { String($0.prefix(5)) }
+            return short
+        }
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        searchBar.endEditing(false)
+        searchController.searchBar.endEditing(false)
     }
 }
 
 extension ViewController: UITableViewDataSource {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if isFiltering {
+            guard let username = suggestions?[indexPath.row] else { return }
+            getRepos(for: username)
+        }
+    }
+    
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let headerCell = tableView.dequeueReusableCell(withIdentifier: "headercell") as! HeaderCell
         
-        if let language = coordinator?.sortedLanguages()[section],
+        if let count = suggestions?.count, isFiltering {
+            headerCell.config("Suggestions", count)
+        } else if let language = coordinator?.sortedLanguages()[section],
             let count = coordinator?.repos.value?[section].count {
             headerCell.config(language, count)
         }
@@ -153,28 +203,42 @@ extension ViewController: UITableViewDataSource {
         return headerCell
     }
     
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        guard let language = coordinator?.sortedLanguages()[section] else { return "" }
-        return language
-    }
-    
     func numberOfSections(in tableView: UITableView) -> Int {
-        guard let count = coordinator?.repos.value?.count else { return 0 }
-        return count
+        if isFiltering {
+            return 1
+        } else {
+            guard let count = coordinator?.repos.value?.count else { return 0 }
+            return count
+        }
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        guard let count = coordinator?.repos.value?[section].count else { return 0 }
-        return count
+        if isFiltering {
+            guard let count = suggestions?.count else { return 0 }
+            return count
+        } else {
+            guard let count = coordinator?.repos.value?[section].count else { return 0 }
+            return count
+        }
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "gitcell") as! RepoCell
-        
-        if let repo = coordinator?.repos.value?[indexPath.section][indexPath.row] {
-            cell.config(repo)
+        if isFiltering {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "searchcell")!
+            
+            if let text = suggestions?[indexPath.row] {
+                cell.textLabel?.text = text
+            }
+            
+            return cell
+        } else {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "gitcell") as! RepoCell
+            
+            if let repo = coordinator?.repos.value?[indexPath.section][indexPath.row] {
+                cell.config(repo)
+            }
+            
+            return cell
         }
-        
-        return cell
     }
 }

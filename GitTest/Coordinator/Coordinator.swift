@@ -27,35 +27,46 @@ class Coordinator {
         database.delegate = self
         
         networkService.delegate = self
-        networkService.state.asObservable().subscribe(onNext: { [unowned self] (result) in
-            DispatchQueue.main.async {
-                switch result {
-                case .loaded:
-                    break
-                case .error(let errorMessage):
-                    switch errorMessage {
-                    case .networkError(let errorString):
-                        self.loadFromDatabase()
-                        if self.languages.count == 0 {
-                            self.errorMessage.value = ("Network error", errorString)
-                        }
-                    case .noData, .unknown:
-                        self.loadFromDatabase()
-                        self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
-                    case .noResult:
-                        self.errorMessage.value = ("Nothing found", "There is no such user or organization.")
-                        self.repos.value = nil
+        networkService.state.asObservable().observeOn(MainScheduler.instance).subscribe(onNext: { [unowned self] (result) in
+            switch result {
+            case .loaded:
+                break
+            case .error(let errorMessage):
+                switch errorMessage {
+                case .networkError(let errorString):
+                    self.loadFromDatabase()
+                    if self.languages.count == 0 {
+                        self.errorMessage.value = ("Network error", errorString)
                     }
-                case .loading: self.repos.value = nil
+                case .noData, .unknown:
+                    self.loadFromDatabase()
+                    self.errorMessage.value = ("Unknown error", "Unknown error was occured!")
+                case .noResult:
+                    self.errorMessage.value = ("Nothing found", "There is no such user or organization.")
+                    self.repos.value = nil
                 }
+            case .loading: self.repos.value = nil
             }
         }).disposed(by: bag)
+    }
+    
+    func loadSuggestions(_ username: String) -> Single<[String]> {
+        return Single<[String]>.create(subscribe: { [weak self] (single) -> Disposable in
+            self?.networkService.searchUser(username: username, completion: { (list) in
+                single(.success(list))
+            }, failure: {
+                single(.error(NSError(domain: "Suggestion", code: 100, userInfo: nil)))
+            })
+
+            return Disposables.create {  }
+        }).observeOn(MainScheduler.instance)
     }
 
     func load(username: String) {
         errorMessage.value = nil
         currentSearch = username
         languages.removeAll()
+        self.repos.value = nil
         networkService.load(username: currentSearch)
     }
     
