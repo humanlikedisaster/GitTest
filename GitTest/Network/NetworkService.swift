@@ -47,9 +47,9 @@ class NetworkService {
         
     }
     
-    func searchUser(username: String, completion: @escaping ([String]) -> Void, failure: @escaping () -> Void) {
+    func searchUser(username: String, searchScope: SearchScope, completion: @escaping ([String]) -> Void, failure: @escaping () -> Void) {
         let urlString: String
-        urlString = "\(host)search/users?q=\(username)+in:login&client_id=\(self.oauthService.clientId)&client_secret=\(self.oauthService.clientSecret)"
+        urlString = "\(host)search/users?q=\(username)\(searchScope.query())&client_id=\(self.oauthService.clientId)&client_secret=\(self.oauthService.clientSecret)"
         guard let url = URL(string: urlString) else { return }
         
         getWrapped(url: url, completion: { (response) in

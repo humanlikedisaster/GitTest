@@ -152,17 +152,28 @@
                             <activityIndicatorView hidden="YES" opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" hidesWhenStopped="YES" style="whiteLarge" translatesAutoresizingMaskIntoConstraints="NO" id="wbU-aJ-F6q">
                                 <rect key="frame" x="169" y="347" width="37" height="37"/>
                             </activityIndicatorView>
+                            <label hidden="YES" opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Retry with another username or organization" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Qkp-Me-SkR">
+                                <rect key="frame" x="0.5" y="342" width="375" height="48"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="20"/>
+                                <nil key="textColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
                         </subviews>
                         <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
                             <constraint firstAttribute="trailing" secondItem="aBI-q2-neJ" secondAttribute="trailing" id="7pC-cu-xnS"/>
                             <constraint firstItem="xSX-1m-bMr" firstAttribute="centerY" secondItem="wbU-aJ-F6q" secondAttribute="centerY" id="AQF-dA-j0P"/>
+                            <constraint firstItem="Qkp-Me-SkR" firstAttribute="width" secondItem="6Tk-OE-BBY" secondAttribute="width" id="CWX-iS-Irg"/>
                             <constraint firstItem="xSX-1m-bMr" firstAttribute="centerX" secondItem="wbU-aJ-F6q" secondAttribute="centerX" id="Iq8-4X-sho"/>
+                            <constraint firstItem="wbU-aJ-F6q" firstAttribute="centerY" secondItem="6Tk-OE-BBY" secondAttribute="centerY" id="STO-bK-oRw"/>
                             <constraint firstAttribute="bottom" secondItem="aBI-q2-neJ" secondAttribute="bottom" id="TNv-2n-mpj"/>
                             <constraint firstItem="wbU-aJ-F6q" firstAttribute="centerY" secondItem="aBI-q2-neJ" secondAttribute="centerY" id="ZEu-xj-2TE"/>
                             <constraint firstItem="aBI-q2-neJ" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leading" id="bWE-fc-eey"/>
+                            <constraint firstItem="wbU-aJ-F6q" firstAttribute="centerX" secondItem="6Tk-OE-BBY" secondAttribute="centerX" id="hk2-PO-YHJ"/>
+                            <constraint firstItem="Qkp-Me-SkR" firstAttribute="centerX" secondItem="6Tk-OE-BBY" secondAttribute="centerX" id="js1-B1-dtd"/>
                             <constraint firstItem="aBI-q2-neJ" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" id="mpZ-k7-Xh9"/>
                             <constraint firstItem="wbU-aJ-F6q" firstAttribute="centerX" secondItem="aBI-q2-neJ" secondAttribute="centerX" id="ycF-WY-wkg"/>
+                            <constraint firstItem="Qkp-Me-SkR" firstAttribute="centerY" secondItem="6Tk-OE-BBY" secondAttribute="centerY" id="yhe-bh-KR1"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
@@ -171,6 +182,7 @@
                         <outlet property="activityBackground" destination="xSX-1m-bMr" id="Pf9-5s-Ffd"/>
                         <outlet property="activityIndicator" destination="wbU-aJ-F6q" id="rnh-vD-XCB"/>
                         <outlet property="bottomConstraint" destination="TNv-2n-mpj" id="tl2-A2-r6t"/>
+                        <outlet property="noResultLabel" destination="Qkp-Me-SkR" id="5gV-RM-QAU"/>
                         <outlet property="tableView" destination="aBI-q2-neJ" id="7VA-RG-FjC"/>
                     </connections>
                 </viewController>

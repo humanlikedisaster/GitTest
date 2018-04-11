@@ -49,6 +49,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     @IBOutlet weak var activityBackground: UIView!
     @IBOutlet weak var tableView: UITableView!
+    @IBOutlet weak var noResultLabel: UILabel!
     @IBOutlet weak var bottomConstraint: NSLayoutConstraint!
     
     private func searchBarIsEmpty() -> Bool {
@@ -64,6 +65,7 @@ class ViewController: UIViewController {
         
         searchController.searchBar.delegate = self
         
+        searchController.searchBar.scopeButtonTitles = ["Everywhere", "Login", "Email", "Full name"]
         searchController.searchBar.placeholder = "Search Users/Organizations"
         searchController.dimsBackgroundDuringPresentation = false
         navigationItem.searchController = searchController
@@ -84,9 +86,16 @@ class ViewController: UIViewController {
                 self?.tableView.reloadData()
                 
                 if repoList == nil && self?.coordinator?.errorMessage.value == nil {
+                    self?.noResultLabel.isHidden = true
                     self?.startLoading()
                 } else {
                     self?.stopLoading()
+                    
+                    if self?.coordinator?.errorMessage.value != nil {
+                        self?.noResultLabel.isHidden = false
+                    } else {
+                        self?.noResultLabel.isHidden = true
+                    }
                 }
             }).disposed(by: bag)
             
@@ -95,20 +104,21 @@ class ViewController: UIViewController {
                     self.showErrorAlert(error.0, error.1)
                 }
             }).disposed(by: bag)
-        
-            searchController.searchBar.rx.text.orEmpty
-                .throttle(0.3, scheduler: MainScheduler.instance)
-                .distinctUntilChanged()
+            
+            let textObservable = searchController.searchBar.rx.text.orEmpty.distinctUntilChanged().throttle(0.5, scheduler: MainScheduler.instance)
+            
+            Observable.combineLatest(textObservable, searchController.searchBar.rx.selectedScopeButtonIndex)
                 .observeOn(MainScheduler.instance)
-                .flatMapLatest { [weak self] query -> Single<[String]> in
+                .flatMapLatest { [unowned self] (query, index) -> Single<[String]> in
                     let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if query.isEmpty {
+                    if query.isEmpty || query.count < 3 {
                         return Single.never()
                     }
                     
-                    self?.startLoading()
+                    self.startLoading()
                     
-                    guard let single = self?.coordinator?.loadSuggestions(query) else {
+                    guard let searchScope = SearchScope(rawValue: index),
+                        let single = self.coordinator?.loadSuggestions(query, searchScope) else {
                         return Single.never()
                     }
                     return single
@@ -164,6 +174,10 @@ extension ViewController: UISearchBarDelegate {
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         searchController.isActive = false
         tableView.reloadData()
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, selectedScopeButtonIndexDidChange selectedScope: Int) {
+        
     }
 }
 

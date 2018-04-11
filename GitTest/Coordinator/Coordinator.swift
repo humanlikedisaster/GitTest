@@ -11,6 +11,23 @@ import RxSwift
 import RxCocoa
 import RealmSwift
 
+enum SearchScope: Int {
+    case all = 0, login, email, fullname
+    
+    func query() -> String {
+        switch self {
+        case .all:
+            return ""
+        case .login:
+            return "+in:login"
+        case .email:
+            return "+in:email"
+        case .fullname:
+            return "+in:fullname"
+        }
+    }
+}
+
 class Coordinator {
     fileprivate let database = Database()
     fileprivate let networkService = NetworkService()
@@ -18,13 +35,13 @@ class Coordinator {
     fileprivate var currentLoad: Observable<NetworkState>?
     
     fileprivate var languages: [String] = []
-
+    
     let errorMessage = Variable<(String, String)?>(nil)
     let repos = Variable<[Results<Repo>]?>([])
     
-    func loadSuggestions(_ username: String) -> Single<[String]> {
+    func loadSuggestions(_ username: String, _ searchScope: SearchScope) -> Single<[String]> {
         return Single<[String]>.create(subscribe: { [weak self] (single) -> Disposable in
-            self?.networkService.searchUser(username: username, completion: { (list) in
+            self?.networkService.searchUser(username: username, searchScope: searchScope, completion: { (list) in
                 single(.success(list))
             }, failure: {
                 single(.error(NSError(domain: "Suggestion", code: 100, userInfo: nil)))
