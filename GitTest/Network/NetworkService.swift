@@ -40,7 +40,6 @@ class NetworkService {
     
     func load(username: String) -> Observable<NetworkState> {
         return Observable<NetworkState>.create({ [unowned self] (observable) -> Disposable in
-            print("Loading started!")
             self.getData(username: username, currentPage: 1, observable)
             
             return Disposables.create { }

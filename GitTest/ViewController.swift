@@ -163,6 +163,7 @@ extension ViewController: UISearchBarDelegate {
     
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         searchController.isActive = false
+        tableView.reloadData()
     }
 }
 
@@ -177,7 +178,7 @@ extension ViewController: UITableViewDelegate {
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        searchController.isActive = false
+        searchController.searchBar.endEditing(false)
     }
 }
 
