@@ -104,7 +104,7 @@ class ViewController: UIViewController {
                 }
             }).disposed(by: bag)
             
-            let textObservable = searchController.searchBar.rx.text.orEmpty.distinctUntilChanged().throttle(0.5, scheduler: MainScheduler.instance)
+            let textObservable = searchController.searchBar.rx.text.orEmpty.distinctUntilChanged().throttle(1, scheduler: MainScheduler.instance)
             
             Observable.combineLatest(textObservable, searchController.searchBar.rx.selectedScopeButtonIndex)
                 .observeOn(MainScheduler.instance)
@@ -176,8 +176,11 @@ extension ViewController: UISearchBarDelegate {
         tableView.reloadData()
     }
     
-    func searchBar(_ searchBar: UISearchBar, selectedScopeButtonIndexDidChange selectedScope: Int) {
-        
+    func searchBar(_ searchBar: UISearchBar, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        let currentText = searchBar.text ?? ""
+        guard let stringRange = Range(range, in: currentText) else { return false }
+        let updatedText = currentText.replacingCharacters(in: stringRange, with: text)
+        return updatedText.count <= 20
     }
 }
 
