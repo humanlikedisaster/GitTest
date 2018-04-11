@@ -86,7 +86,6 @@ class ViewController: UIViewController {
                 self?.tableView.reloadData()
                 
                 if repoList == nil && self?.coordinator?.errorMessage.value == nil {
-                    self?.noResultLabel.isHidden = true
                     self?.startLoading()
                 } else {
                     self?.stopLoading()
@@ -140,6 +139,7 @@ class ViewController: UIViewController {
     }
     
     fileprivate func startLoading() {
+        noResultLabel.isHidden = true
         activityIndicator.startAnimating()
         activityBackground.isHidden = false
     }
